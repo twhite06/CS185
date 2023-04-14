@@ -25,36 +25,66 @@ def get_paragraphs(soup):
 
 def get_paragraphs_navVer(soup, toc_section):
     # Find toc section in html
-    toc_section.replace(' ', '_')
-    print(toc_section)
-    print("=============")
-    print("=============")
-    print("=============")
+    # print(toc_section)
+    toc_section = toc_section.strip()
+    if toc_section.count(" ") >= 1:
+        toc_section = toc_section.replace(' ', '_')
+    # print(toc_section)
+    # print("=============")
+    # print("=============")
+    # print("=============")
     target_section = soup.find('span', {'class': 'mw-headline', 'id': toc_section})
+    # print(target_section)
     
     if not target_section:
         return []
 
     # Get the parent <h2> tag of the target_section
     h2_tag = target_section.find_parent('h2')
-    print(h2_tag)
+    # print(h2_tag)
 
 
     # Initialize an empty list to store the paragraph texts
     paragraphs_texts = []
-    
+    # print("before curr elem")
     # Iterate through the next elements starting from the found <h2> tag
-    current_element = target_section.find_next_sibling()
-    print(current_element)
+    current_element = h2_tag.find_next_sibling()
+    # print("after curr elem")
+    # print(current_element)
+    p_counter = 0
     while current_element:
-        print(current_element)
+        # print(current_element)
         # Check if the current element is an <h2> tag
+        print("in while loop")
         if current_element.name == 'h2':
             break
 
         # If the current element is a <p> tag, add its text to the list
         if current_element.name == 'p':
             paragraphs_texts.append(current_element.text)
+            print(paragraphs_texts[p_counter])
+            p_counter += 1
+
+        # If the current element is an <h3> tag, add its text to the list
+        if current_element.name == 'h3':
+            string_to_appnd = ''
+            string_to_appnd += current_element.text
+            string_to_appnd += ("\n")
+            string_to_appnd += ("=========")
+            string_to_appnd += ("\n\n")
+            current_element = current_element.find_next_sibling()
+            iterator = "iterating"
+            while iterator:
+                if current_element.name == 'p':
+                    string_to_appnd += (current_element.text)
+                    iterator = None
+                else:
+                    current_element = current_element.find_next_sibling()
+                    continue
+            paragraphs_texts.append(string_to_appnd)
+            print(paragraphs_texts[p_counter])
+            p_counter += 1
+
 
         # Move to the next element
         current_element = current_element.find_next_sibling()
