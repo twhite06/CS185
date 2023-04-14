@@ -96,15 +96,9 @@ def sms_reply():
 
     elif current_state == 'reading_nsearch':
         paragraphs, navbar_elems = wiki.main(user_states[sender]['curr_word'], incoming_msg.capitalize())
-        # Send the first paragraph as a message
-        # if len(paragraphs) < 2:
-        #     gptParagraph = wiki.gptSearch(incoming_msg)
-        #     resp.message (gptParagraph)
-        #     resp.message("Please choose one of the following options (Type 1, 2, or 3):\n\n1. Info\n2. Search for a word\n3. Exit TextWiki")
-        #     user_states[sender]['state'] = 'menu'
-        # else:
+        user_states[sender]['paragraphs'] = paragraphs
         user_states[sender]['current_paragraph'] = 1
-        resp.message("Here is information about your requested topic:\n\n" + paragraphs[1])
+        resp.message("Here is information about your requested topic:\n\n" + paragraphs[0])
         resp.message("Please choose one of the following options (Type 1, 2, or 3):\n\n1. Learn more about this topic\n2. Search for a different Wikipedia page\n3. Return to the main menu")
         user_states[sender]['state'] = 'reading_gsearch'
 
