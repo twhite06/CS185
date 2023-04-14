@@ -4,7 +4,6 @@ import wiki
 
 app = Flask(__name__)
 
-test
 user_states = {}
 
 @app.route("/", methods=['GET', 'POST'])
