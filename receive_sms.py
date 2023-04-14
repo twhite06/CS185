@@ -1,131 +1,148 @@
-from flask import Flask, request, redirect
-from twilio.twiml.messaging_response import MessagingResponse, Media
-import wiki
+import wikipedia as wiki
+import requests
+import string
+import openai
+from bs4 import BeautifulSoup
 
-app = Flask(__name__)
+def getWord(lang, searchInput):
+    ui = string.capwords(searchInput)
+    lists = ui.split()
+    word = "_".join(lists)
 
-user_states = {}
+    if word == "QUIT":
+        return 0
+    else:
+            return "https://" + lang + ".wikipedia.org/wiki/" + word
 
-@app.route("/", methods=['GET', 'POST'])
-def sms_reply():
-    # Get the incoming message and sender's phone number
-    incoming_msg = request.values.get('Body', '').lower()
-    #Concatenate the user's input
-    incoming_msg = incoming_msg.replace(' ', '_')
-    sender = request.values.get('From', '')
 
-    # Start our TwiML response
-    resp = MessagingResponse()
+def get_paragraphs(soup):
+    paragraphs = soup("p")
+    paragraphs_texts = [p.text for p in paragraphs]
+    # with open('output.txt', 'w', encoding='utf-8') as f:
+    #     for paragraph in paragraphs_texts:
+    #         f.write(paragraph + '\n\n')
+    return paragraphs_texts
 
-    # Check if the user is in the user_states dictionary
-    if sender not in user_states:
-        user_states[sender] = {'state': 'menu'}
-
-    # Get the current state of the user
-    current_state = user_states[sender]['state']
-
-    if current_state == 'menu':
-        if 'menu' == incoming_msg:
-            # Send the menu options to the user
-            resp.message("\nWelcome to TextWiki. Please choose one of the following options (Type 1, 2, or 3):\n\n1. Info\n2. Search for a word\n3. Exit TextWiki")
-        elif '1' == incoming_msg or '1.' == incoming_msg:
-            # Respond with message for Option 1
-            resp.message("TextWiki is designed to offer the features of searching for a word and navigating through the Wikipedia page containing information about that word via text message.\n In its current state 'V1.0' TextWiki allows you to search for a word and view search results in small snippets of information. You may also request for more information about a word if necessary.\n\n---\n\nTextWiki will be 'released' incrementally with upcoming versions including features such as:\n\n V1.1: More robust navigation by means of the navigation bar to view information by section\n V1.2: ChatGPT integration to offer support for topics that do not have sufficient information via the Wikipeadia page\n V1.3: Access to works cited referenced in Wikipedia page\n V1.4: Access to pictures associated with given Wikipedia page.\n\n---\n\nPlease choose one of the following options (Type 1, 2, or 3):\n\n1. Info\n2. Search for a word\n3. Exit TextWiki")
-            # resp.message("TextWiki will be 'released' incrementally with upcoming versions including features such as:\n\n V1.1: More robust navigation by means of the navigation bar to view information by section\n V1.2: ChatGPT integration to offer support for topics that do not have sufficient information via the Wikipeadia page\n V1.3: Access to works cited referenced in Wikipedia page\n V1.4: Access to pictures associated with given Wikipedia page.")
-            # resp.message("Please choose one of the following options (Type 1, 2, or 3):\n\n1. Info\n2. Search for a word\n3. Exit TextWiki")
-            user_states[sender]['state'] = 'menu'
-        elif '2' == incoming_msg or '2.' == incoming_msg:
-            # Update the user's state
-            user_states[sender]['state'] = 'choose search'
-            # Respond with message for Option 2
-            resp.message("Please choose search method (Type 1, 2, or 3):\n\n 1. General search \n(Populate topic information navigating by paragraph. Similar to scrolling down Wikipedia page)\n\n 2. Navigated search \n(Populate topic information navigating by table of contents. Similar to using Navigation bar/table of contents on Wikipedia page.)\n\n3. Back to main menu")
-        elif '3' == incoming_msg or '3.' == incoming_msg:
-            # Respond with message for Option 3
-            resp.message("Thanks for using TextWiki! See you again soon")
-        else:
-            # If the user sends any other message, send an error message
-            resp.message("Sorry, we didn't understand your message. Please choose one of the options from the menu.")
+def get_paragraphs_navVer(soup, toc_section):
+    # Find toc section in html
+    # print(toc_section)
+    toc_section = toc_section.strip()
+    if toc_section.count(" ") >= 1:
+        toc_section = toc_section.replace(' ', '_')
+    # print(toc_section)
+    # print("=============")
+    # print("=============")
+    # print("=============")
+    target_section = soup.find('span', {'class': 'mw-headline', 'id': toc_section})
+    # print(target_section)
     
-    elif current_state == 'choose search':
-        if '1' == incoming_msg or '1.' == incoming_msg:
-            # Update the user's state
-            user_states[sender]['state'] = 'general search'
-            resp.message("What topic would you like to search for?")
-        elif '2' == incoming_msg or '2.' == incoming_msg:
-            user_states[sender]['state'] = 'navigate search'
-            resp.message("What topic would you like to search for?")
-            # msg = resp.message ("This feature is currently in development! Please check back soon for a more robust search experience :D !")
-            # msg.media("https://img.freepik.com/free-vector/abstract-coming-soon-halftone-style-background-design_1017-27282.jpg")
-        elif '3' == incoming_msg or '3.' == incoming_msg:
-            user_states[sender]['state'] = 'menu'
-            resp.message("\nWelcome to TextWiki. Please choose one of the following options (Type 1, 2, or 3):\n\n1. Info\n2. Search for a word\n3. Exit TextWiki")
+    if not target_section:
+        return []
+
+    # Get the parent <h2> tag of the target_section
+    h2_tag = target_section.find_parent('h2')
+    # print(h2_tag)
+
+
+    # Initialize an empty list to store the paragraph texts
+    paragraphs_texts = []
+    # print("before curr elem")
+    # Iterate through the next elements starting from the found <h2> tag
+    current_element = h2_tag.find_next_sibling()
+    # print("after curr elem")
+    # print(current_element)
+    p_counter = 0
+    while current_element:
+        # print(current_element)
+        # Check if the current element is an <h2> tag
+        print("in while loop")
+        if current_element.name == 'h2':
+            break
+
+        # If the current element is a <p> tag, add its text to the list
+        if current_element.name == 'p':
+            paragraphs_texts.append(current_element.text)
+            print(paragraphs_texts[p_counter])
+            p_counter += 1
+
+        # If the current element is an <h3> tag, add its text to the list
+        if current_element.name == 'h3':
+            string_to_appnd = ''
+            string_to_appnd += current_element.text
+            string_to_appnd += ("\n")
+            string_to_appnd += ("=========")
+            string_to_appnd += ("\n\n")
+            current_element = current_element.find_next_sibling()
+            iterator = "iterating"
+            while iterator:
+                if current_element.name == 'p':
+                    string_to_appnd += (current_element.text)
+                    iterator = None
+                else:
+                    current_element = current_element.find_next_sibling()
+                    continue
+            paragraphs_texts.append(string_to_appnd)
+            print(paragraphs_texts[p_counter])
+            p_counter += 1
+
+
+        # Move to the next element
+        current_element = current_element.find_next_sibling()
+
+    print(paragraphs_texts)
+    return paragraphs_texts
+
+
+def wikiSearch(url, toc_section=''):
+    if url == 0:
+        return ''
+    else:
+        searchReq = requests.get(url)
+        soup = BeautifulSoup(searchReq.content, "html.parser")
+        if toc_section == '':
+            paragraphs = get_paragraphs(soup)
+            navbar_elems = get_navbar_elems(soup)
+            return paragraphs, navbar_elems
+        else:
+            paragraphs = get_paragraphs_navVer(soup, toc_section)
+            navbar_elems = get_navbar_elems(soup)
+            return paragraphs, navbar_elems       
+
+def get_navbar_elems(soup):
+    # Find the table of contents section of Wikipedia page
+    navbar = soup.find('div', {'id': 'vector-toc'})
+    # print(navbar)
+    if not navbar:
+        return None
+
+    # Find the list of page categories for the table of contents
+    category_list = navbar.find('ul', {'id': 'mw-panel-toc-list'})
     
-    elif current_state == 'general search':
-        # Call the wiki.main function with the user's query
-        paragraphs, navbar = wiki.main(incoming_msg)
-        user_states[sender]['paragraphs'] = paragraphs
+    # Find all the "li" elements with the specified class
+    cat_list_elems = category_list.find_all('li', class_=lambda x: x and 'vector-toc-list-item' in x and 'vector-toc-level-1' in x)
 
-        # Send the first paragraph as a message
-        if len(paragraphs) < 2:
-            gptParagraph = wiki.gptSearch(incoming_msg)
-            resp.message (gptParagraph)
-            resp.message("Please choose one of the following options (Type 1, 2, or 3):\n\n1. Info\n2. Search for a word\n3. Exit TextWiki")
-            user_states[sender]['state'] = 'menu'
-        else:
-            user_states[sender]['current_paragraph'] = 1
-            resp.message("Here is information about your requested topic:\n\n" + paragraphs[1])
-            resp.message("Please choose one of the following options (Type 1, 2, or 3):\n\n1. Learn more about this topic\n2. Search for a different Wikipedia page\n3. Return to the main menu")
-            user_states[sender]['state'] = 'reading_gsearch'
-
-    elif current_state == 'navigate search':
-        # Call the wiki.main function with the user's query
-        paragraphs, navbar_elems = wiki.main(incoming_msg)
-        user_states[sender]['curr_word'] = incoming_msg
-        # Add if statement to check if word is less than 2 paragraphs
-        resp.message("Which Section would you like to view (please type the name of the section you want to view):")
-        navbar_items = ""
-        for item in navbar_elems:
-            if item == 'mw-content-text' or item == 'See_also' or item == 'References' or item == 'External_links' or item == 'Further_reading' or item == 'Notes':
-                continue
-            else:
-                item = item.replace('_', ' ')
-                navbar_items += item + "\n\n========\n"
-        resp.message(navbar_items)
-        user_states[sender]['state'] = 'reading_nsearch'
+    # Extract ids of all found "li" elements
+    li_ids = [li['id'] for li in cat_list_elems]
+    
+    # Remove "toc-" from the strings in the li_ids list
+    li_ids_stripped = [li_id.replace('toc-', '') for li_id in li_ids]
+    # print(li_ids_stripped)
 
 
-    elif current_state == 'reading_nsearch':
-        paragraphs, navbar_elems = wiki.main(user_states[sender]['curr_word'], incoming_msg.capitalize())
-        user_states[sender]['paragraphs'] = paragraphs
-        user_states[sender]['current_paragraph'] = 1
-        resp.message("Here is information about your requested topic:\n\n" + paragraphs[0])
-        resp.message("Please choose one of the following options (Type 1, 2, or 3):\n\n1. Learn more about this topic\n2. Search for a different Wikipedia page\n3. Return to the main menu")
-        user_states[sender]['state'] = 'reading_gsearch'
+    # with open('output.txt', 'w', encoding='utf-8') as f:
+    #     for navElement in toc_items:
+    #         f.write(navElement + '\n\n')
 
-        
+    # return toc_items
+    return li_ids_stripped
 
-    elif current_state == 'reading_gsearch':
-        if '1' == incoming_msg or '1.' == incoming_msg:
-            user_states[sender]['current_paragraph'] += 1
-            if user_states[sender]['current_paragraph'] < len(user_states[sender]['paragraphs']):
-                resp.message("Here is information about your requested topic:\n\n" + user_states[sender]['paragraphs'][user_states[sender]['current_paragraph']])
-                resp.message("Please choose one of the following options (Type 1, 2, or 3):\n\n1. Learn more about this topic\n2. Search for a different Wikipedia page\n3. Return to the main menu")
-            else:
-                resp.message("No more information available on this topic at this time. Type 'menu' to return to the main menu.")
-                user_states[sender]['state'] = 'menu'
-        elif '2' == incoming_msg or '2.' == incoming_msg:
-            user_states[sender]['state'] = 'choose search'
-            resp.message("Please choose search method (Type 1, 2, or 3):\n\n 1. General search (Populate topic information navigating by paragraph. Similar to scrolling down Wikipedia page)\n 2. Navigated search (Populate topic information navigating by table of contents. Similar to using Navigation bar/table of contents on Wikipedia page.)\n3. Back to main menu")
-        elif '3' == incoming_msg or '3.' == incoming_msg:
-            user_states[sender]['state'] = 'menu'
-            resp.message("\nWelcome to TextWiki. Please choose one of the following options (Type 1, 2, or 3):\n\n1. Info\n2. Search for a word\n3. Exit TextWiki")        
-        else:
-            resp.message("Sorry, we didn't understand your message. Please choose one of the options from the menu (Type 1, 2, or 3):\n\n1. Learn more about this topic\n2. Search for a different word\n3. Return to the main menu")
+def main(word_to_search, toc_section=''):
+    langUI = 'en'
+    url = getWord(langUI, word_to_search)
+    paragraphs, navbar_elems = wikiSearch(url, toc_section)
+    return paragraphs, navbar_elems
 
-
-    return str(resp)
-
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
+def gptSearch(word_to_search):
+  openai.api_key = "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"
+  response = openai.Completion.create(model="text-davinci-003", prompt=("Just write me a paragraph for the following word: " + word_to_search), temperature=.6, max_tokens=1024)
+  return response.choices[0].text.strip()
