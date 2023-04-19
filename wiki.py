@@ -25,7 +25,8 @@ def get_paragraphs(soup):
 
 def get_paragraphs_navVer(soup, toc_section):
     # Find toc section in html
-    # print(toc_section)
+
+    print("in getParNav " + toc_section)
     toc_section = toc_section.strip()
     if toc_section.count(" ") >= 1:
         toc_section = toc_section.replace(' ', '_')
@@ -55,14 +56,17 @@ def get_paragraphs_navVer(soup, toc_section):
     while current_element:
         # print(current_element)
         # Check if the current element is an <h2> tag
-        print("in while loop")
+        # print("in while loop")
         if current_element.name == 'h2':
             break
 
         # If the current element is a <p> tag, add its text to the list
         if current_element.name == 'p':
             paragraphs_texts.append(current_element.text)
-            print(paragraphs_texts[p_counter])
+            # print("this is paragraph", p_counter)
+            # print("=============")
+            # print(paragraphs_texts[p_counter])
+
             p_counter += 1
 
         # If the current element is an <h3> tag, add its text to the list
@@ -82,7 +86,9 @@ def get_paragraphs_navVer(soup, toc_section):
                     current_element = current_element.find_next_sibling()
                     continue
             paragraphs_texts.append(string_to_appnd)
-            print(paragraphs_texts[p_counter])
+            # print("this is paragraph", p_counter)
+            # print("=============")
+            # print(paragraphs_texts[p_counter])
             p_counter += 1
 
 
@@ -90,6 +96,9 @@ def get_paragraphs_navVer(soup, toc_section):
         current_element = current_element.find_next_sibling()
 
     print(paragraphs_texts)
+    if paragraphs_texts == []:
+        message = "*****\n\nWE'RE SORRY!\n\nTextWiki only supports providing information in paragraph text format. Information under this section is unavailable as it consists of either a table, a list of links, only media (pictures and videos), or some other information unavailable to view with textWiki."
+        paragraphs_texts.append(message)
     return paragraphs_texts
 
 
@@ -104,8 +113,10 @@ def wikiSearch(url, toc_section=''):
             navbar_elems = get_navbar_elems(soup)
             return paragraphs, navbar_elems
         else:
+            # print("In wikiSearch " +toc_section)
             paragraphs = get_paragraphs_navVer(soup, toc_section)
             navbar_elems = get_navbar_elems(soup)
+            # print(paragraphs)
             return paragraphs, navbar_elems       
 
 def get_navbar_elems(soup):
@@ -139,10 +150,11 @@ def get_navbar_elems(soup):
 def main(word_to_search, toc_section=''):
     langUI = 'en'
     url = getWord(langUI, word_to_search)
+    # print("In main " + toc_section)
     paragraphs, navbar_elems = wikiSearch(url, toc_section)
     return paragraphs, navbar_elems
 
 def gptSearch(word_to_search):
-  openai.api_key = "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"
-  response = openai.Completion.create(model="text-davinci-003", prompt=("Just write me a paragraph for the following word: " + word_to_search), temperature=.6, max_tokens=1024)
+  openai.api_key = "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"
+  response = openai.Completion.create(model="text-davinci-003", prompt=("Please give me objective information about the following term: " + word_to_search), temperature=.6, max_tokens=1024)
   return response.choices[0].text.strip()
