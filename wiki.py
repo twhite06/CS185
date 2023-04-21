@@ -158,3 +158,28 @@ def gptSearch(word_to_search):
   openai.api_key = "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"
   response = openai.Completion.create(model="text-davinci-003", prompt=("Please give me objective information about the following term: " + word_to_search), temperature=.6, max_tokens=1024)
   return response.choices[0].text.strip()
+
+def get_wikipedia_references(soup):
+    # Get all the span tags that have the class "citation"
+    referenceList = soup.find_all(class_="citation")
+
+    # For every tag, strip away all other tags in the span so only text remains
+    refText = []
+    for reference in referenceList:
+        refText.append(reference.get_text())
+
+    # Return the list of citation texts
+    return refText
+
+def getImages(soup):
+    #Get a list of all image tags in the page
+    images = soup.find_all("img")
+
+    #strip the image tags to just the src
+    imageList = []
+    for image in images:
+        if 'src' in image.attrs:
+            imageList.append(image['src'])
+
+    #return list of image links
+    return imageList
